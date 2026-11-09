@@ -11,10 +11,14 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed-templates.ts",
-    "icons": "tsx scripts/generate-icons.ts"
+    "icons": "tsx scripts/generate-icons.ts",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@imgly/background-removal": "^1.7.0",
+    "@opennextjs/cloudflare": "^1.20.16",
     "@serwist/next": "^9.5.13",
     "@supabase/supabase-js": "^2.119.0",
     "@use-gesture/react": "^10.3.1",
@@ -40,7 +44,8 @@
     "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.159.0"
   },
   "type": "module"
 }

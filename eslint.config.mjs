@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "public/workers/**",
     "public/swe-worker*.js",
     "supabase/functions/**",
+    ".open-next/**",
+    ".wrangler/**",
+    ".cf-home/**",
   ]),
 ]);
 

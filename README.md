@@ -110,7 +110,25 @@ Reads `TEMPLATES_DIR` (default `C:\Users\Onema\OneDrive\문서\tluangtluang coll
 **OneDrive:** if a file can't be read it's probably an online-only placeholder. Right-click the folder →
 **Always keep on this device**, wait for the sync, and re-run.
 
-## 5. Deploy to Vercel (free)
+## 5. Deploy to Cloudflare Workers (current hosting)
+
+Live: **https://tluangtluangcollection.k-ramneihsiamamax.workers.dev**
+
+Hosted on the **k.ramneihsiamamax@gmail.com** Cloudflare account (`account_id` is pinned in
+`wrangler.jsonc`) via [OpenNext](https://opennext.js.org/cloudflare). The `NEXT_PUBLIC_*` values are
+read from `.env.local` at build time, so build on a machine that has it.
+
+```bash
+# one-time: log in to the k.ramneihsiamamax account (kept separate from any other wrangler login)
+set XDG_CONFIG_HOME=D:\TluangTluangCollection\.cf-home      # PowerShell: $env:XDG_CONFIG_HOME="..."
+npx wrangler login        # sign in as k.ramneihsiamamax in the browser that opens → Allow
+npx wrangler whoami       # must show k.ramneihsiamamax@gmail.com
+
+# every deploy (same XDG_CONFIG_HOME set)
+npm run deploy            # = opennextjs-cloudflare build && opennextjs-cloudflare deploy
+```
+
+## 5b. Alternative: Vercel (free)
 
 1. Push this repo to GitHub (already done: `kramneihsiamamax-ctrl/tluangtluangcollection`).
 2. Go to <https://vercel.com/new> → **Import** the repo. Framework preset: **Next.js** (auto). Leave
