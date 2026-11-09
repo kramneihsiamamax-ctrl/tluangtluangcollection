@@ -151,13 +151,14 @@ export async function uploadTemplate(file: File): Promise<Template> {
 }
 
 export async function deleteTemplate(t: Template) {
-  if (t.source !== "upload") throw new Error("Only uploaded templates can be deleted.");
   const sb = supabase();
-  // Storage first: the delete policy checks that the row is an uploaded template.
-  const rm = await sb.storage.from("templates").remove([t.full_path, t.thumb_path]);
-  if (rm.error) throw new Error(rm.error.message);
-  const { error } = await sb.from("templates").delete().eq("id", t.id);
+  // Row first (RLS silently deletes nothing when not allowed, so check what came back),
+  // then the files. Storage objects of a deleted row are removed right after.
+  const { data, error } = await sb.from("templates").delete().eq("id", t.id).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Not allowed to delete this template.");
+  const rm = await sb.storage.from("templates").remove([t.full_path, t.thumb_path]);
+  if (rm.error) console.warn("template files not removed", rm.error.message);
   fullCache.delete(t.id);
   templatesStore.set((s) => ({ ...s, list: s.list.filter((x) => x.id !== t.id) }));
   lsSet(LS.templates, templatesStore.get().list);

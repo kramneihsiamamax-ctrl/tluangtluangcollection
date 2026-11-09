@@ -105,7 +105,8 @@ npm run seed            # = npx tsx scripts/seed-templates.ts
 Reads `TEMPLATES_DIR` (default `C:\Users\Onema\OneDrive\문서\tluangtluang collection`, falling back to
 `./template`). Each file → `sharp().rotate()` → JPEG q92 mozjpeg at full resolution (metadata stripped)
 + 400px-wide thumbnail q80 → uploaded to `templates/full/<uuid>.jpg` and `templates/thumbs/<uuid>.jpg`
-→ row with `source='seed'`, `sort_order` from the filename number. Re-running skips names already seeded.
+→ row with `source='seed'`, `sort_order` from the filename number. Re-running skips names already seeded — but a seed template you
+deleted in the app counts as missing, so re-running the seed would add it back.
 
 **OneDrive:** if a file can't be read it's probably an online-only placeholder. Right-click the folder →
 **Always keep on this device**, wait for the sync, and re-run.

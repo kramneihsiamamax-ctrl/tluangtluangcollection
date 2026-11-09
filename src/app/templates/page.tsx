@@ -50,7 +50,6 @@ export default function TemplatesScreen() {
 
   const startPress = (t: Template) => {
     press.current.fired = false;
-    if (t.source !== "upload") return;
     press.current.timer = setTimeout(() => {
       press.current.fired = true;
       navigator.vibrate?.(10);
@@ -128,7 +127,9 @@ export default function TemplatesScreen() {
 
       {error && !list.length && <p className="mt-4 text-[14px] text-sub">Couldn&apos;t load templates: {error}</p>}
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <p className="mt-3 text-[13px] text-sub">Tap to set as default · Long-press to delete</p>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -159,7 +160,7 @@ export default function TemplatesScreen() {
                 setDefaultTemplate(t.id);
                 toast(`${t.name ?? "Template"} set as default`);
               }}
-              aria-label={`${t.name ?? "Template"}${t.source === "upload" ? " (uploaded — long-press to delete)" : ""}`}
+              aria-label={`${t.name ?? "Template"} (long-press to delete)`}
               aria-pressed={sel}
               className={cx(
                 "press relative aspect-[3/4] overflow-hidden rounded-2xl border-2 bg-g2",
