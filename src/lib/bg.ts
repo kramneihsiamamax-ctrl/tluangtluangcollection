@@ -1,4 +1,4 @@
-import type { WorkerIn, WorkerOut } from "@/workers/bg-removal.worker";
+import type { Profile, WorkerIn, WorkerOut } from "@/workers/bg-removal.worker";
 import { createStore, useStore } from "./store";
 
 export interface ModelState {
@@ -12,6 +12,24 @@ export const modelStore = createStore<ModelState>({ status: "idle", loaded: 0, t
 export const useModel = () => useStore(modelStore);
 
 type Handler = (msg: WorkerOut) => void;
+
+function isPhone(): boolean {
+  const ua = navigator.userAgent;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+/** GB of RAM (Chrome only; other browsers report nothing). */
+function deviceMemory(): number | undefined {
+  return (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+}
+
+/** Phones and low-RAM devices: smaller model on CPU, smaller working size — avoids tab crashes. */
+export function deviceProfile(): Profile & { maxSide: number } {
+  const mem = deviceMemory();
+  const lowMemory = isPhone() || (mem !== undefined && mem <= 4);
+  const maxSide = !lowMemory ? 4096 : mem !== undefined && mem >= 8 ? 3072 : 2048;
+  return { lowMemory, maxSide };
+}
 
 let worker: Worker | null = null;
 const handlers = new Map<string, Handler>();
@@ -58,12 +76,13 @@ export function preloadModel() {
   const s = modelStore.get().status;
   if (s === "loading" || s === "ready") return;
   modelStore.set((st) => ({ ...st, status: "loading" }));
-  send({ type: "preload" });
+  send({ type: "preload", profile: deviceProfile() });
 }
 
-export function processInWorker(id: string, file: Blob, maxSide: number, previewMax: number, onMessage: Handler) {
+export function processInWorker(id: string, file: Blob, previewMax: number, onMessage: Handler) {
   handlers.set(id, onMessage);
-  send({ type: "process", id, file, maxSide, previewMax });
+  const profile = deviceProfile();
+  send({ type: "process", id, file, maxSide: profile.maxSide, previewMax, profile });
 }
 
 export function releaseHandler(id: string) {

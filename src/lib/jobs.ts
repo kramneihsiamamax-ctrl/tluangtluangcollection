@@ -8,8 +8,6 @@ import { createStore, lsGet, useStore } from "./store";
 import { resolveTemplateId } from "./templates";
 import type { Composition, Ratio } from "./types";
 
-/** Working resolution cap for a product photo (export max is 3840px, so nothing is lost). */
-const MAX_SIDE = 4096;
 
 export type JobStatus = "processing" | "ready" | "error";
 
@@ -179,7 +177,7 @@ export function restoreJobs(): Promise<void> {
 
 // ---------------------------------------------------------------- processing
 function runJob(id: string, file: Blob) {
-  processInWorker(id, file, MAX_SIDE, PREVIEW_MAX, async (msg) => {
+  processInWorker(id, file, PREVIEW_MAX, async (msg) => {
     switch (msg.type) {
       case "decode-failed": {
         if (isHeic(file as File) && file.type !== "image/jpeg") {

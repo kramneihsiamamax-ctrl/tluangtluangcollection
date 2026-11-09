@@ -10,8 +10,13 @@ import { preload, removeBackground, type Config } from "@imgly/background-remova
 declare const self: DedicatedWorkerGlobalScope;
 
 export type WorkerIn =
-  | { type: "preload" }
-  | { type: "process"; id: string; file: Blob; maxSide: number; previewMax: number };
+  | { type: "preload"; profile: Profile }
+  | { type: "process"; id: string; file: Blob; maxSide: number; previewMax: number; profile: Profile };
+
+/** Phones get the smaller model on CPU: WebGPU and the fp16 model can exhaust a mobile tab's memory. */
+export interface Profile {
+  lowMemory: boolean;
+}
 
 export type WorkerOut =
   | { type: "preload-progress"; loaded: number; total: number }
@@ -34,11 +39,23 @@ export type WorkerOut =
 const post = (msg: WorkerOut, transfer: Transferable[] = []) => self.postMessage(msg, transfer);
 
 let device: "gpu" | "cpu" = "cpu";
-try {
-  // WebGPU is much faster where available; we fall back to CPU (WASM) on any failure.
-  device = "gpu" in self.navigator && (self.navigator as Navigator & { gpu?: unknown }).gpu ? "gpu" : "cpu";
-} catch {
-  device = "cpu";
+let model: "isnet_fp16" | "isnet_quint8" = "isnet_fp16";
+let configured = false;
+
+function configure(p: Profile) {
+  if (configured) return;
+  configured = true;
+  if (p.lowMemory) {
+    device = "cpu";
+    model = "isnet_quint8";
+    return;
+  }
+  try {
+    // WebGPU is much faster on desktops; we fall back to CPU (WASM) on any failure.
+    device = "gpu" in self.navigator && (self.navigator as Navigator & { gpu?: unknown }).gpu ? "gpu" : "cpu";
+  } catch {
+    device = "cpu";
+  }
 }
 
 const fileSizes = new Map<string, [number, number]>();
@@ -47,7 +64,7 @@ let progressSink: ((loaded: number, total: number) => void) | null = null;
 function baseConfig(): Config {
   return {
     device,
-    model: "isnet_fp16",
+    model,
     output: { format: "image/x-rgba8", quality: 1 },
     progress: (key: string, current: number, total: number) => {
       if (key.startsWith("fetch:")) {
@@ -116,8 +133,10 @@ async function handleProcess(id: string, file: Blob, maxSide: number, previewMax
   ctx.fillRect(0, 0, W, H);
   ctx.drawImage(bmp, 0, 0, W, H);
   bmp.close();
-  const rgba = ctx.getImageData(0, 0, W, H);
   const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.95 });
+  let input: Blob | null = new Blob([ctx.getImageData(0, 0, W, H).data], { type: `image/x-rgba8;width=${W};height=${H}` });
+  // Release the canvas backing store before the model runs (keeps peak memory down on phones).
+  canvas.width = canvas.height = 1;
   post({ type: "original", id, blob: jpeg, width: W, height: H });
 
   // 3) Segment. Download progress (first run only) and coarse compute stages.
@@ -129,13 +148,12 @@ async function handleProcess(id: string, file: Blob, maxSide: number, previewMax
   }
   post({ type: "progress", id, stage: "decode", value: 0.1 });
 
-  const input = new Blob([rgba.data], { type: `image/x-rgba8;width=${W};height=${H}` });
   const cfg = baseConfig();
   cfg.progress = (key: string) => {
     if (key === "compute:inference") post({ type: "progress", id, stage: "inference", value: 0.25 });
     if (key === "compute:mask") post({ type: "progress", id, stage: "mask", value: 0.8 });
   };
-  let out: Blob;
+  let out: Blob | null;
   try {
     out = await removeBackground(input, cfg);
   } catch (err) {
@@ -146,7 +164,9 @@ async function handleProcess(id: string, file: Blob, maxSide: number, previewMax
     await ensureModel();
     out = await removeBackground(input, { ...cfg, device: "cpu" });
   }
+  input = null;
   const data = new Uint8ClampedArray(await out.arrayBuffer());
+  out = null;
   post({ type: "progress", id, stage: "trim", value: 0.9 });
 
   // 4) Trim transparent margins so "centred" means the product is centred.
@@ -196,6 +216,7 @@ let queue: Promise<void> = Promise.resolve();
 
 self.onmessage = (e: MessageEvent<WorkerIn>) => {
   const msg = e.data;
+  configure(msg.profile);
   if (msg.type === "preload") {
     queue = queue.then(handlePreload);
     return;
