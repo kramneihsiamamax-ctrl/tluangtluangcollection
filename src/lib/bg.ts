@@ -18,7 +18,8 @@ const handlers = new Map<string, Handler>();
 
 function getWorker(): Worker {
   if (worker) return worker;
-  worker = new Worker(new URL("../workers/bg-removal.worker.ts", import.meta.url), { type: "module" });
+  // Bundled separately by scripts/build-worker.mjs (see there for why).
+  worker = new Worker("/workers/bg-removal.js", { type: "module", name: "bg-removal" });
   worker.onmessage = (e: MessageEvent<WorkerOut>) => {
     const msg = e.data;
     switch (msg.type) {

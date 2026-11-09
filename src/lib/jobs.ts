@@ -95,33 +95,47 @@ interface StoredJob {
 
 const IDX = "tc.jobs.index";
 
-async function persistIndex() {
+// All IndexedDB writes go through one queue: they are read-modify-write and a new batch
+// clears the previous one, so ordering matters.
+let idbQueue: Promise<void> = Promise.resolve();
+
+function enqueue(task: () => Promise<void>): Promise<void> {
+  idbQueue = idbQueue.then(async () => {
+    try {
+      await task();
+    } catch {
+      /* IndexedDB unavailable — editing still works in memory */
+    }
+  });
+  return idbQueue;
+}
+
+function persistIndex(): Promise<void> {
   const s = jobsStore.get();
-  try {
-    await set(IDX, { ids: s.jobs.map((j) => j.id), activeId: s.activeId });
-  } catch {
-    /* IndexedDB unavailable — editing still works in memory */
-  }
+  const value = { ids: s.jobs.map((j) => j.id), activeId: s.activeId };
+  return enqueue(() => set(IDX, value));
 }
 
-async function persistJob(id: string, patch: Partial<StoredJob>) {
-  try {
-    const cur = (await get<StoredJob>(`tc.job.${id}`)) ?? { id, name: "", comp: defaultComp() };
-    await set(`tc.job.${id}`, { ...cur, ...patch });
-  } catch {
-    /* ignore */
-  }
-}
-
-async function clearPersisted() {
-  try {
+function clearPersisted(): Promise<void> {
+  return enqueue(async () => {
     const idx = await get<{ ids: string[] }>(IDX);
     await Promise.all((idx?.ids ?? []).map((id) => del(`tc.job.${id}`)));
     await del(IDX);
-  } catch {
-    /* ignore */
-  }
+  });
 }
+
+function persistJob(id: string, patch: Partial<StoredJob>): Promise<void> {
+  idbQueue = idbQueue.then(async () => {
+    try {
+      const cur = (await get<StoredJob>(`tc.job.${id}`)) ?? { id, name: "", comp: defaultComp() };
+      await set(`tc.job.${id}`, { ...cur, ...patch });
+    } catch {
+      /* IndexedDB unavailable — editing still works in memory */
+    }
+  });
+  return idbQueue;
+}
+
 
 let restoring: Promise<void> | null = null;
 

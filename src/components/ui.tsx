@@ -63,7 +63,7 @@ export function Switch({
         )}
       />
       <span
-        className="absolute left-[3px] top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-transform duration-150"
+        className="absolute left-[3px] top-1/2 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-transform duration-150"
         style={{ transform: `translate3d(${checked ? 28 : 0}px, -50%, 0)` }}
       />
     </button>

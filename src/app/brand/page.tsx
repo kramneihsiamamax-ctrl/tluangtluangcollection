@@ -67,8 +67,8 @@ export default function BrandScreen() {
       {/* Live preview */}
       <div
         ref={boxRef}
-        className="relative mt-3 overflow-hidden rounded-[22px] border border-line bg-g2"
-        style={{ aspectRatio: "4 / 5" }}
+        className="relative mx-auto mt-3 w-[62%] max-w-[300px] overflow-hidden rounded-[22px] border border-line bg-g2 shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+        style={{ aspectRatio: "3 / 4" }}
         aria-label="Watermark preview"
       >
         {template && (
