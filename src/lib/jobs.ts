@@ -26,6 +26,8 @@ export interface Job {
   full?: ImageBitmap;
   /** ≤1440px cutout for the editor preview. */
   preview?: ImageBitmap;
+  /** Where the trimmed cutout sits inside the original photo (needed for the Restore brush). */
+  crop?: { x: number; y: number; w: number; h: number };
   /** width / height of the cutout. */
   aspect: number;
   empty?: boolean;
@@ -89,6 +91,7 @@ interface StoredJob {
   comp: Composition;
   original?: Blob;
   png?: Blob;
+  crop?: { x: number; y: number; w: number; h: number };
 }
 
 const IDX = "tc.jobs.index";
@@ -162,6 +165,7 @@ export function restoreJobs(): Promise<void> {
           full,
           preview,
           aspect: full.width / full.height,
+          crop: sj.crop,
           comp: { ...sj.comp, templateId: resolveTemplateId(sj.comp.templateId) },
         });
       }
@@ -194,6 +198,7 @@ function runJob(id: string, file: Blob) {
       }
       case "original": {
         patchJob(id, { originalBlob: msg.blob, progress: 0.12, stage: "remove" });
+        if (!getJob(id)) return; // removed while processing
         void persistJob(id, { original: msg.blob });
         // Store the original product photo (JPEG). Auto-deleted after 24 h.
         void uploadCreation(msg.blob, "original", null, null).catch((e) =>
@@ -210,6 +215,11 @@ function runJob(id: string, file: Blob) {
         return;
       }
       case "done": {
+        if (!getJob(id)) {
+          msg.full.close();
+          msg.preview.close();
+          return;
+        }
         patchJob(id, {
           status: "ready",
           stage: "done",
@@ -217,12 +227,14 @@ function runJob(id: string, file: Blob) {
           full: msg.full,
           preview: msg.preview,
           aspect: msg.crop.w / msg.crop.h,
+          crop: msg.crop,
           empty: msg.empty,
         });
         return;
       }
       case "png": {
-        void persistJob(id, { png: msg.blob });
+        const cur = getJob(id);
+        if (cur) void persistJob(id, { png: msg.blob, crop: cur.crop });
         releaseHandler(id);
         return;
       }
@@ -282,4 +294,48 @@ export function updateCompAll(patch: Partial<Composition>) {
 
 export function markExported(id: string, key: string, uploaded: boolean) {
   patchJob(id, { exported: { key, uploaded } });
+}
+
+/** Remove one photo from the current batch (memory + IndexedDB draft). */
+export function removeJob(id: string) {
+  const s = jobsStore.get();
+  const idx = s.jobs.findIndex((j) => j.id === id);
+  if (idx < 0) return;
+  disposeJob(s.jobs[idx]);
+  const jobs = s.jobs.filter((j) => j.id !== id);
+  const activeId = s.activeId === id ? (jobs[Math.min(idx, jobs.length - 1)]?.id ?? null) : s.activeId;
+  jobsStore.set({ jobs, activeId });
+  void persistIndex();
+  void enqueue(() => del(`tc.job.${id}`));
+}
+
+/** Replace a job's cutout after manual touch-up (erase / restore brush). */
+export function applyTouchUp(
+  id: string,
+  r: { full: ImageBitmap; preview: ImageBitmap; crop?: Job["crop"]; png: Blob | null; empty: boolean },
+) {
+  const old = getJob(id);
+  if (!old) {
+    r.full.close();
+    r.preview.close();
+    return;
+  }
+  patchJob(id, {
+    full: r.full,
+    preview: r.preview,
+    crop: r.crop,
+    aspect: r.full.width / r.full.height,
+    empty: r.empty,
+    exported: undefined,
+  });
+  old.full?.close();
+  old.preview?.close();
+  if (r.png) void persistJob(id, { png: r.png, crop: r.crop });
+}
+
+/** Delete every draft photo (memory + IndexedDB). */
+export function clearAllJobs() {
+  jobsStore.get().jobs.forEach(disposeJob);
+  jobsStore.set({ jobs: [], activeId: null });
+  void clearPersisted();
 }

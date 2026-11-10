@@ -1,14 +1,16 @@
 "use client";
 
 import { useGesture } from "@use-gesture/react";
-import { Check, ChevronLeft, Crosshair, ImagePlus, Stamp } from "lucide-react";
+import { Check, ChevronLeft, Crosshair, ImagePlus, Paintbrush, Stamp, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePhotoPicker } from "@/components/AppProviders";
-import { Button, IconButton, Pill, Spinner, Switch, cx, toast } from "@/components/ui";
+import { TouchUp } from "@/components/TouchUp";
+import { Button, IconButton, Pill, Sheet, Spinner, Switch, cx, toast } from "@/components/ui";
 import { LS, MAX_SCALE, MIN_SCALE, RATIOS, RATIO_VALUE, WATERMARK_SRC } from "@/lib/constants";
-import { restoreJobs, setActiveJob, updateComp, updateCompAll, useJobs } from "@/lib/jobs";
+import { removeJob, restoreJobs, setActiveJob, updateComp, updateCompAll, useJobs } from "@/lib/jobs";
+import { openImageInput } from "@/lib/image";
 import { watermarkRect } from "@/lib/render";
 import { setDefaultTemplate, useSettings } from "@/lib/settings";
 import { lsSet } from "@/lib/store";
@@ -26,6 +28,8 @@ export default function Editor() {
   const settings = useSettings();
   const { list: templates } = useTemplates();
   const [restored, setRestored] = useState(false);
+  const [armDel, setArmDel] = useState(false);
+  const [touchUp, setTouchUp] = useState(false);
 
   useEffect(() => {
     void restoreJobs().then(() => setRestored(true));
@@ -249,15 +253,20 @@ export default function Editor() {
   return (
     <main className="pt-safe mx-auto flex h-dvh max-w-[560px] flex-col overflow-hidden bg-app">
       <header className="flex h-14 shrink-0 items-center justify-between px-4">
-        <IconButton aria-label="Back" onClick={() => router.push("/home")}>
-          <ChevronLeft size={22} strokeWidth={1.8} />
-        </IconButton>
+        <div className="flex w-[100px] gap-2">
+          <IconButton aria-label="Back" onClick={() => router.push("/home")}>
+            <ChevronLeft size={22} strokeWidth={1.8} />
+          </IconButton>
+          <IconButton aria-label="Delete this photo" onClick={() => setArmDel(true)} style={{ color: "#c62828" }}>
+            <Trash2 size={20} strokeWidth={1.8} />
+          </IconButton>
+        </div>
         <h1 className="text-[17px] font-semibold">Edit</h1>
         <button
           type="button"
           disabled={!ready}
           onClick={() => router.push("/export")}
-          className="press h-11 rounded-[14px] bg-ink px-5 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="press h-11 w-[100px] rounded-[14px] bg-ink text-[15px] font-semibold text-white disabled:opacity-40"
         >
           Export
         </button>
@@ -387,7 +396,7 @@ export default function Editor() {
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4" aria-label="Templates">
           <button
             type="button"
-            onClick={() => uploadInput.current?.click()}
+            onClick={() => openImageInput(uploadInput.current)}
             disabled={uploading}
             className="press flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-dashed border-g5 text-[11px] font-semibold text-sub"
             aria-label="Upload template"
@@ -423,7 +432,7 @@ export default function Editor() {
             <div className="flex h-16 items-center px-2 text-[13px] text-sub">No templates yet — upload one.</div>
           )}
         </div>
-        <input ref={uploadInput} type="file" accept="image/*,.heic,.heif" className="hidden" onChange={onUploadTemplate} />
+        <input ref={uploadInput} type="file" accept="image/*" className="hidden" onChange={onUploadTemplate} />
 
         <div className="mt-3 flex items-center gap-3">
           <span className="w-10 text-[14px] font-semibold">Size</span>
@@ -440,9 +449,18 @@ export default function Editor() {
           <button
             type="button"
             onClick={centre}
-            className="press flex h-11 items-center gap-1.5 rounded-[14px] border border-line px-3 text-[14px] font-semibold"
+            aria-label="Centre"
+            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-line"
           >
-            <Crosshair size={18} strokeWidth={1.8} /> Centre
+            <Crosshair size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setTouchUp(true)}
+            disabled={!ready || !job.full}
+            className="press flex h-11 shrink-0 items-center gap-1.5 rounded-[14px] bg-ink px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+          >
+            <Paintbrush size={18} strokeWidth={1.8} /> Touch up
           </button>
         </div>
 
@@ -468,6 +486,32 @@ export default function Editor() {
           />
         </div>
       </section>
+
+      {touchUp && job.full && <TouchUp key={job.id} job={job} onClose={() => setTouchUp(false)} />}
+
+      <Sheet open={armDel} onClose={() => setArmDel(false)} label="Delete photo">
+        <div className="pb-3">
+          <h2 className="text-[20px] font-bold">Delete this photo?</h2>
+          <p className="mt-1 text-[14px] text-sub">
+            {jobs.length > 1 ? "It's removed from this batch and its saved draft." : "Its saved draft is removed."}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => setArmDel(false)}>
+              Cancel
+            </Button>
+            <Button
+              style={{ background: "#c62828" }}
+              onClick={() => {
+                setArmDel(false);
+                removeJob(job.id);
+                toast("Photo deleted");
+              }}
+            >
+              <Trash2 size={18} strokeWidth={1.8} /> Delete
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </main>
   );
 }

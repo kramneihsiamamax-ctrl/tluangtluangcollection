@@ -4,6 +4,7 @@ import { Check, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { TabPage } from "@/components/TabBar";
 import { Button, Pill, Sheet, Spinner, cx, toast } from "@/components/ui";
+import { openImageInput } from "@/lib/image";
 import { setDefaultTemplate, useSettings } from "@/lib/settings";
 import { deleteTemplate, thumbUrl, uploadTemplate, useTemplates } from "@/lib/templates";
 import type { Template } from "@/lib/types";
@@ -18,6 +19,7 @@ export default function TemplatesScreen() {
   const [uploading, setUploading] = useState(0);
   const [toDelete, setToDelete] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [manage, setManage] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({ timer: null, fired: false });
 
@@ -82,7 +84,7 @@ export default function TemplatesScreen() {
         <h1 className="text-[28px] font-bold tracking-tight">Templates</h1>
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => openImageInput(inputRef.current)}
           className="press flex h-11 items-center gap-1.5 rounded-[14px] bg-ink px-4 text-[15px] font-semibold text-white"
         >
           {uploading ? <Spinner light className="h-4 w-4" /> : <Upload size={18} strokeWidth={1.8} />} Upload
@@ -91,7 +93,7 @@ export default function TemplatesScreen() {
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.heic,.heif"
+        accept="image/*"
         multiple
         className="hidden"
         onChange={onFiles}
@@ -122,17 +124,29 @@ export default function TemplatesScreen() {
         >
           Uploaded
         </Pill>
-        <span className="ml-auto self-center text-[13px] text-sub">{loaded ? `${shown.length} shown` : ""}</span>
+        <button
+          type="button"
+          onClick={() => setManage((m) => !m)}
+          className={cx(
+            "press ml-auto flex h-11 items-center gap-1.5 rounded-full border px-4 text-[14px] font-semibold",
+            manage ? "border-ink bg-ink text-white" : "border-line bg-white text-[#c62828]",
+          )}
+        >
+          {manage ? <Check size={16} strokeWidth={2.4} /> : <Trash2 size={16} strokeWidth={1.8} />}
+          {manage ? "Done" : "Delete"}
+        </button>
       </div>
 
       {error && !list.length && <p className="mt-4 text-[14px] text-sub">Couldn&apos;t load templates: {error}</p>}
 
-      <p className="mt-3 text-[13px] text-sub">Tap to set as default · Long-press to delete</p>
+      <p className="mt-3 text-[13px] text-sub">
+        {manage ? "Tap a template to delete it" : `Tap to set as default · ${loaded ? shown.length : 0} templates`}
+      </p>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => openImageInput(inputRef.current)}
           className="press flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-g5 bg-white text-[13px] font-semibold text-sub"
         >
           {uploading ? <Spinner /> : <Plus size={24} strokeWidth={1.8} />}
@@ -157,6 +171,7 @@ export default function TemplatesScreen() {
               onContextMenu={(e) => e.preventDefault()}
               onClick={() => {
                 if (press.current.fired) return;
+                if (manage) return setToDelete(t);
                 setDefaultTemplate(t.id);
                 toast(`${t.name ?? "Template"} set as default`);
               }}
@@ -180,6 +195,13 @@ export default function TemplatesScreen() {
               {sel && (
                 <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-ink text-white">
                   <Check size={14} strokeWidth={3} />
+                </span>
+              )}
+              {manage && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#c62828] shadow">
+                    <Trash2 size={20} strokeWidth={1.8} />
+                  </span>
                 </span>
               )}
               {t.source === "upload" && (
@@ -206,7 +228,7 @@ export default function TemplatesScreen() {
             <Button variant="secondary" onClick={() => setToDelete(null)}>
               Cancel
             </Button>
-            <Button onClick={confirmDelete} disabled={deleting}>
+            <Button onClick={confirmDelete} disabled={deleting} style={{ background: "#c62828" }}>
               {deleting ? <Spinner light className="h-4 w-4" /> : <Trash2 size={18} strokeWidth={1.8} />} Delete
             </Button>
           </div>

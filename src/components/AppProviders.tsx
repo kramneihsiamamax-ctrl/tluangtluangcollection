@@ -7,6 +7,7 @@ import { preloadModel } from "@/lib/bg";
 import { startBatch } from "@/lib/jobs";
 import { initSettings } from "@/lib/settings";
 import { initTemplates } from "@/lib/templates";
+import { openImageInput } from "@/lib/image";
 import { ToastHost } from "./ui";
 
 const PickerContext = createContext<() => void>(() => {});
@@ -31,10 +32,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   const open = useCallback(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.value = "";
-    el.click();
+    openImageInput(inputRef.current);
   }, []);
 
   const onFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +51,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,.heic,.heif"
+          accept="image/*"
           multiple
           className="hidden"
           aria-hidden

@@ -82,3 +82,20 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
     img.src = src;
   });
 }
+
+/**
+ * `accept` for photo inputs. Android Chrome opens the gallery / Photo Picker only when `accept`
+ * is plain MIME types — any file extension (.heic) sends it to the Files app instead.
+ * Elsewhere (desktop) the extensions let HEIC files with no MIME type through.
+ */
+export function imageAccept(): string {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent) ? "image/*" : "image/*,.heic,.heif";
+}
+
+/** Open a hidden photo input with the right `accept` for this device. */
+export function openImageInput(el: HTMLInputElement | null) {
+  if (!el) return;
+  el.accept = imageAccept();
+  el.value = "";
+  el.click();
+}

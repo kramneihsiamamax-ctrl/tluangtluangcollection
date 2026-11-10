@@ -6,6 +6,7 @@
  * (for IndexedDB only — never uploaded) follows in a separate message.
  */
 import { preload, removeBackground, type Config } from "@imgly/background-removal";
+import { refineCutout } from "../lib/refine";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -168,6 +169,14 @@ async function handleProcess(id: string, file: Blob, maxSide: number, previewMax
   const data = new Uint8ClampedArray(await out.arrayBuffer());
   out = null;
   post({ type: "progress", id, stage: "trim", value: 0.9 });
+
+  // 3b) Clean up: plain-backdrop leftovers, edge halo, tiny specks (see lib/refine.ts).
+  try {
+    const st = refineCutout(data, W, H);
+    console.info("[bg] refine", st);
+  } catch (e) {
+    console.warn("[bg] refine failed", e);
+  }
 
   // 4) Trim transparent margins so "centred" means the product is centred.
   let minX = W;

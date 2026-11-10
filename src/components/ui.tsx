@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { createStore, useStore } from "@/lib/store";
 
 function cx(...c: (string | false | null | undefined)[]) {
@@ -156,15 +157,17 @@ export function Sheet({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-  if (!open) return null;
-  return (
+  if (!open || typeof document === "undefined") return null;
+  // Portal: page wrappers animate with transforms, which would trap a fixed sheet under the tab bar.
+  return createPortal(
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={label}>
       <button aria-label="Close" className="fade-in absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="sheet-in pb-safe absolute inset-x-0 bottom-0 mx-auto max-w-[520px] rounded-t-[28px] bg-white px-5 pt-3">
+      <div className="sheet-in pb-safe absolute inset-x-0 bottom-0 mx-auto max-h-[92dvh] max-w-[520px] overflow-y-auto overscroll-contain rounded-t-[28px] bg-white px-5 pt-3">
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-g4" />
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

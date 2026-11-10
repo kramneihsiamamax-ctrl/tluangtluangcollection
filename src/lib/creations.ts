@@ -56,3 +56,19 @@ export async function refreshRecent() {
   }
   recentStore.set({ list: (data ?? []) as Creation[], loading: false, loaded: true, error: null });
 }
+
+/** Delete one saved export (file + row) through the server route. */
+export async function deleteCreation(id: string) {
+  const res = await fetch(`/api/creations/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `HTTP ${res.status}`);
+  }
+  recentStore.set((s) => ({ ...s, list: s.list.filter((c) => c.id !== id) }));
+}
+
+/** Delete several exports; returns how many failed. */
+export async function deleteCreations(ids: string[]): Promise<number> {
+  const res = await Promise.allSettled(ids.map((id) => deleteCreation(id)));
+  return res.filter((r) => r.status === "rejected").length;
+}

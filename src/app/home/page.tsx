@@ -1,14 +1,18 @@
 "use client";
 
-import { ArrowRight, Camera, ChevronRight, LayoutGrid, Stamp } from "lucide-react";
+import { ArrowRight, Camera, ChevronRight, LayoutGrid, Stamp, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AboutSheet } from "@/components/AboutSheet";
 import { usePhotoPicker } from "@/components/AppProviders";
 import { HeroLines } from "@/components/Decor";
-import { RecentGrid } from "@/components/RecentGrid";
+import { PhotoSheet } from "@/components/PhotoSheet";
+import { RecentGrid, type RecentItem } from "@/components/RecentGrid";
 import { TabPage } from "@/components/TabBar";
+import { Button, Sheet, toast } from "@/components/ui";
 import { creationUrl, refreshRecent, useRecent } from "@/lib/creations";
+import { clearAllJobs, removeJob, restoreJobs, setActiveJob, useJobs } from "@/lib/jobs";
 import { useSettings } from "@/lib/settings";
 import { useTemplates } from "@/lib/templates";
 
@@ -26,11 +30,16 @@ export default function Home() {
   const recent = useRecent();
   const [about, setAbout] = useState(false);
   const [hello, setHello] = useState("Hello");
+  const router = useRouter();
+  const { jobs } = useJobs();
+  const [delDraft, setDelDraft] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<RecentItem | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- time-of-day greeting is client-only
     setHello(greeting());
     void refreshRecent();
+    void restoreJobs();
   }, []);
 
   const wmOn = settings.watermark.enabled;
@@ -84,6 +93,47 @@ export default function Home() {
         </Link>
       </div>
 
+      {jobs.length > 0 && (
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[18px] font-bold">Drafts</h2>
+            <button
+              type="button"
+              onClick={() => setDelDraft("all")}
+              className="press flex h-11 items-center gap-1 text-[14px] font-semibold text-[#c62828]"
+            >
+              <Trash2 size={16} strokeWidth={1.8} /> Clear all
+            </button>
+          </div>
+          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            {jobs.map((j) => (
+              <div key={j.id} className="relative h-24 w-24 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveJob(j.id);
+                    router.push("/editor");
+                  }}
+                  aria-label="Continue editing"
+                  className="press h-full w-full overflow-hidden rounded-2xl border border-line bg-g2"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={j.sourceUrl} alt="" className="h-full w-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDelDraft(j.id)}
+                  aria-label="Delete draft"
+                  className="press absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full border border-line bg-white text-[#c62828] shadow-sm"
+                >
+                  <X size={16} strokeWidth={2.2} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[18px] font-bold">Recent</h2>
@@ -95,9 +145,35 @@ export default function Home() {
           items={recent.list.slice(0, 9).map((c) => ({ id: c.id, url: creationUrl(c), ratio: c.ratio }))}
           loading={!recent.loaded}
           empty="Your photos from the last 24 hours will show up here."
+          onOpen={setPhoto}
         />
       </section>
 
+      <Sheet open={!!delDraft} onClose={() => setDelDraft(null)} label="Delete draft">
+        <div className="pb-3">
+          <h2 className="text-[20px] font-bold">
+            {delDraft === "all" ? `Delete all ${jobs.length} drafts?` : "Delete this draft?"}
+          </h2>
+          <p className="mt-1 text-[14px] text-sub">This can&apos;t be undone.</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => setDelDraft(null)}>
+              Cancel
+            </Button>
+            <Button
+              style={{ background: "#c62828" }}
+              onClick={() => {
+                if (delDraft === "all") clearAllJobs();
+                else if (delDraft) removeJob(delDraft);
+                setDelDraft(null);
+                toast("Deleted");
+              }}
+            >
+              <Trash2 size={18} strokeWidth={1.8} /> Delete
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+      <PhotoSheet item={photo} onClose={() => setPhoto(null)} />
       <AboutSheet open={about} onClose={() => setAbout(false)} />
     </TabPage>
   );
